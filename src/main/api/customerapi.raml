@@ -1,0 +1,84 @@
+#%RAML 1.0
+title: Customer API
+version: v1
+
+mediaType: application/json
+
+types: 
+  Customer:
+    type: object
+    properties: 
+      id?: integer
+      firstName?: string
+      lastName?: string
+      address?: string
+
+/customers:
+  get:
+    description: Returns all the customers
+    responses: 
+      200: 
+        body: 
+          type: Customer[]
+          example: |
+            [
+              {"id": 1, "firstName": "Joe", "lastName" : "Dai", "address": "8 Rhinevale Close"},
+              {"id": 2, "firstName": "Shubin", "lastName" : "Dai", "address": "1 Happy Street"}
+            ]
+  
+  post:
+    description: |
+      Creates customers with infomation provided. You can provide more than one customers in the payload to perform batch creation.
+    body: 
+      application/json:
+        type: Customer[]
+        
+    responses: 
+      201:
+        description: |
+          Customers are created successfully
+  /{id}:
+    get: 
+      description: Retrieves the customer by id
+      responses: 
+        200:
+          body: 
+            type: Customer
+            example: {"id": 1, "firstName": "Joe", "lastName" : "Dai", "address": "8 Rhinevale Close"}
+        404:
+          body: 
+            description: |
+              Customer not found. This error occurs when there is not customer found with the id provided
+            example: {"error" : "Customer not found"}
+
+    delete:
+      description: Deletes the customer by id
+      responses: 
+        204:
+          description: |
+            Customer was deleted successfully
+        404:
+          body: 
+            description: |
+              Customer not found. This error occurs when there is not customer found with the id provided
+            example: {"error" : "Customer not found"}
+
+    put:
+      description: Updates the customer details
+      body: 
+        application/json:
+          type: Customer
+      responses: 
+        204:
+          description: Customer was updated successfully
+        400: 
+          description: |
+            The body requested was invalid 
+          body: 
+            example: {"error" : "The body requested was invalid"}
+        404:
+          body: 
+            description: |
+              Customer not found. This error occurs when there is not customer found with the id provided
+            example: {"error" : "Customer not found"}
+      
