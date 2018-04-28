@@ -52,9 +52,19 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
         </choice>
     </flow>
     <flow name="get:/customers:customerapi-config">
-        <db:select config-ref="MySQL_Configuration" doc:name="Database">
-            <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified from customer]]></db:parameterized-query>
-        </db:select>
+        <choice doc:name="Choice">
+            <when expression="#[message.inboundProperties.'http.query.params'.lastModified == null]">
+                <logger level="INFO" doc:name="Logger"/>
+                <db:select config-ref="MySQL_Configuration" doc:name="Database">
+                    <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified from customer]]></db:parameterized-query>
+                </db:select>
+            </when>
+            <otherwise>
+                <db:select config-ref="MySQL_Configuration" doc:name="Query by last modified date">
+                    <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified from customer where last_modified >  STR_TO_DATE(#[message.inboundProperties.'http.query.params'.lastModified], '%a, %d %b %Y %H:%i:%s')]]></db:parameterized-query>
+                </db:select>
+            </otherwise>
+        </choice>
         <dw:transform-message doc:name="Transform Message">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json

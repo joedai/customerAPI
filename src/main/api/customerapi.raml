@@ -41,8 +41,17 @@ types:
   /{id}:
     get: 
       description: Retrieves the customer by id
+      headers: 
+        If-Modified-Since:
+          required: false
+          description: |
+            The last modified time of the customer information.
+          example: Sat, 28 Apr 2018 21:17:32 GMT
       responses: 
         200:
+          headers: 
+            Last-Modified:
+              description: The last modified time of the customer information returned
           body: 
             type: Customer
             example: {"id": 1, "firstName": "Joe", "lastName" : "Dai", "address": "8 Rhinevale Close"}
@@ -51,6 +60,9 @@ types:
             description: |
               Customer not found. This error occurs when there is not customer found with the id provided
             example: {"error" : "Customer not found"}
+        304:
+          description: |
+            If the customer with the id provided has no change since the modified time specified in the header, not data will be                  returned. This is useful for mobile apps as it saves in bandwidth by returning no body content
 
     delete:
       description: Deletes the customer by id
