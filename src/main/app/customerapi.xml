@@ -69,14 +69,17 @@ payload map ((payload01 , indexOfPayload01) -> {
         </dw:transform-message>
     </flow>
     <flow name="get:/customers/{id}:customerapi-config">
-        <db:select config-ref="MySQL_Configuration" doc:name="Database">
-            <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified from customer where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
-        </db:select>
-        <choice doc:name="Choice">
-            <when expression="#[payload.size() == 1]">
-                <set-payload value="#[payload[0]]" doc:name="Set Payload"/>
-                <dw:transform-message doc:name="Transform Message">
-                    <dw:set-payload><![CDATA[%dw 1.0
+        <choice doc:name="Check if If-Modified-Since Header is present">
+            <when expression="#[message.inboundProperties.'If-Modified-Since' == null]">
+                <logger level="INFO" doc:name="Logger"/>
+                <db:select config-ref="MySQL_Configuration" doc:name="Database">
+                    <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified from customer where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
+                </db:select>
+                <choice doc:name="Choice">
+                    <when expression="#[payload.size() == 1]">
+                        <set-payload value="#[payload[0]]" doc:name="Set Payload"/>
+                        <dw:transform-message doc:name="Transform Message">
+                            <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 ---
 {
@@ -86,17 +89,25 @@ payload map ((payload01 , indexOfPayload01) -> {
 	lastName : payload.last_name,
 	address : payload.address
 }]]></dw:set-payload>
-                </dw:transform-message>
-                <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/json" doc:name="JSON to Object"/>
-                <message-properties-transformer doc:name="Message Properties">
-                    <add-message-property key="Last-Modified" value="#[payload.lastModified]"/>
-                </message-properties-transformer>
-                <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+                        </dw:transform-message>
+                        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/json" doc:name="JSON to Object"/>
+                        <message-properties-transformer doc:name="Message Properties">
+                            <add-message-property key="Last-Modified" value="#[payload.lastModified]"/>
+                        </message-properties-transformer>
+                        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+                    </when>
+                    <otherwise>
+                        <scripting:component doc:name="Groovy">
+                            <scripting:script engine="Groovy"><![CDATA[throw new org.mule.module.apikit.exception.NotFoundException()]]></scripting:script>
+                        </scripting:component>
+                    </otherwise>
+                </choice>
             </when>
             <otherwise>
-                <scripting:component doc:name="Groovy">
-                    <scripting:script engine="Groovy"><![CDATA[throw new org.mule.module.apikit.exception.NotFoundException()]]></scripting:script>
-                </scripting:component>
+                <message-properties-transformer doc:name="Message Properties">
+                    <add-message-property key="http.status" value="304"/>
+                </message-properties-transformer>
+                <set-payload value="#[null]" doc:name="Set Payload"/>
             </otherwise>
         </choice>
     </flow>
