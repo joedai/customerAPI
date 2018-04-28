@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
 http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
@@ -23,7 +23,7 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
     <flow name="put:/customers/{id}:application/json:customerapi-config">
         <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
         <db:update config-ref="MySQL_Configuration" doc:name="Database">
-            <db:parameterized-query><![CDATA[update customer set last_name = #[payload.lastName], first_name = #[payload.firstName], address = #[payload.address] where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
+            <db:parameterized-query><![CDATA[update customer set last_name = #[payload.lastName], first_name = #[payload.firstName], address = #[payload.address], last_modified = UTC_TIMESTAMP() where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
         </db:update>
         <choice doc:name="Choice">
             <when expression="#[payload.equals(0)]">
@@ -53,7 +53,7 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
     </flow>
     <flow name="get:/customers:customerapi-config">
         <db:select config-ref="MySQL_Configuration" doc:name="Database">
-            <db:parameterized-query><![CDATA[select id, first_name, last_name, address from customer]]></db:parameterized-query>
+            <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified from customer]]></db:parameterized-query>
         </db:select>
         <dw:transform-message doc:name="Transform Message">
             <dw:set-payload><![CDATA[%dw 1.0
@@ -61,6 +61,7 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
 ---
 payload map ((payload01 , indexOfPayload01) -> {
 	id: payload01.id,
+	lastModified: (payload01.last_modified as :string {format: "E, d LLL u H:m:s"}) ++ " GMT",
 	firstName: payload01.first_name,
 	lastName: payload01.last_name,
 	address: payload01.address
@@ -69,7 +70,7 @@ payload map ((payload01 , indexOfPayload01) -> {
     </flow>
     <flow name="get:/customers/{id}:customerapi-config">
         <db:select config-ref="MySQL_Configuration" doc:name="Database">
-            <db:parameterized-query><![CDATA[select id, first_name, last_name, address from customer where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
+            <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified from customer where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
         </db:select>
         <choice doc:name="Choice">
             <when expression="#[payload.size() == 1]">
@@ -80,11 +81,17 @@ payload map ((payload01 , indexOfPayload01) -> {
 ---
 {
 	id : payload.id,
+	lastModified: (payload.last_modified as :string {format: "E, d LLL u H:m:s"}) ++ " GMT",
 	firstName : payload.first_name,
 	lastName : payload.last_name,
 	address : payload.address
 }]]></dw:set-payload>
                 </dw:transform-message>
+                <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/json" doc:name="JSON to Object"/>
+                <message-properties-transformer doc:name="Message Properties">
+                    <add-message-property key="Last-Modified" value="#[payload.lastModified]"/>
+                </message-properties-transformer>
+                <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
             </when>
             <otherwise>
                 <scripting:component doc:name="Groovy">
@@ -97,7 +104,7 @@ payload map ((payload01 , indexOfPayload01) -> {
         <json:json-to-object-transformer returnClass="java.util.List" doc:name="JSON to Object"/>
         <foreach collection="#[message.payload]" doc:name="For Each">
             <db:insert config-ref="MySQL_Configuration" doc:name="Database">
-                <db:parameterized-query><![CDATA[insert into customer (`first_name`, `last_name` , `address`) VALUES (#[payload.firstName], #[payload.lastName], #[payload.address])]]></db:parameterized-query>
+                <db:parameterized-query><![CDATA[insert into customer (`first_name`, `last_name` , `address`, `last_modified`) VALUES (#[payload.firstName], #[payload.lastName], #[payload.address], UTC_TIMESTAMP())]]></db:parameterized-query>
             </db:insert>
         </foreach>
     </flow>

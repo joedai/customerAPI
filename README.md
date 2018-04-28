@@ -1,5 +1,7 @@
 # Customer REST API
 
+
+# Features
 This API allows the client to 
 * Create customers in one single request
 * Update a single customer
@@ -21,6 +23,7 @@ CREATE TABLE `customer_schema`.`customer` (
   `first_name` VARCHAR(45) NULL,
   `last_name` VARCHAR(45) NULL,
   `address` VARCHAR(45) NULL,
+  `last_modified` DATETIME NULL,
   PRIMARY KEY (`id`));
-```
+
 
