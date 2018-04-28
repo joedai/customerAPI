@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
 http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
 http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
 http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
 http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
-http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
     <http:listener-config name="customerapi-httpListenerConfig" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
     <apikit:config name="customerapi-config" raml="customerapi.raml" consoleEnabled="false" doc:name="Router" keepRamlBaseUri="false"/>
     <db:mysql-config name="MySQL_Configuration" host="localhost" port="3306" user="root" password="root1234" database="customer_schema" doc:name="MySQL Configuration"/>
@@ -20,24 +21,60 @@ http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mul
         <apikit:console config-ref="customerapi-config" doc:name="APIkit Console"/>
     </flow>
     <flow name="put:/customers/{id}:application/json:customerapi-config">
-        <set-payload value="{&#xA;&quot;error&quot; : &quot;The body requested was invalid&quot;&#xA;}" doc:name="Set Payload"/>
+        <json:json-to-object-transformer doc:name="JSON to Object"/>
+        <db:update config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[update customer set last_name = #[payload.lastName], first_name = #[payload.firstName], address = #[payload.address] where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
+        </db:update>
     </flow>
     <flow name="delete:/customers/{id}:customerapi-config">
-        <set-payload value="{&#xA;&quot;error&quot; : &quot;Customer not found&quot;&#xA;}" doc:name="Set Payload"/>
+        <db:delete config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[delete from customer where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
+        </db:delete>
+        <choice doc:name="Choice">
+            <when expression="#[payload.equals(0)]">
+                <scripting:component doc:name="Groovy">
+                    <scripting:script engine="Groovy"><![CDATA[throw new org.mule.module.apikit.exception.NotFoundException()]]></scripting:script>
+                </scripting:component>
+            </when>
+            <otherwise>
+                <set-payload value="#[null]" doc:name="Set Payload"/>
+            </otherwise>
+        </choice>
     </flow>
     <flow name="get:/customers:customerapi-config">
         <db:select config-ref="MySQL_Configuration" doc:name="Database">
             <db:parameterized-query><![CDATA[select id, first_name, last_name, address from customer]]></db:parameterized-query>
         </db:select>
-        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	id: payload01.id,
+	firstName: payload01.first_name,
+	lastName: payload01.last_name,
+	address: payload01.address
+})]]></dw:set-payload>
+        </dw:transform-message>
     </flow>
     <flow name="get:/customers/{id}:customerapi-config">
         <db:select config-ref="MySQL_Configuration" doc:name="Database">
             <db:parameterized-query><![CDATA[select id, first_name, last_name, address from customer where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
         </db:select>
         <choice doc:name="Choice">
-            <when expression="#[!payload.isEmpty()]">
-                <set-payload value="#[payload[0]]" mimeType="application/json" doc:name="Set Payload"/>
+            <when expression="#[payload.size() == 1]">
+                <set-payload value="#[payload[0]]" doc:name="Set Payload"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	id : payload.id,
+	firstName : payload.first_name,
+	lastName : payload.last_name,
+	address : payload.address
+}]]></dw:set-payload>
+                </dw:transform-message>
             </when>
             <otherwise>
                 <scripting:component doc:name="Groovy">
