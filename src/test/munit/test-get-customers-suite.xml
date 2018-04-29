@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  	xmlns:mock="http://www.mulesoft.org/schema/mule/mock" 
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+	xmlns="http://www.mulesoft.org/schema/mule/core" 
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration" mock-connectors="false" mock-inbounds="false"/>
+    <spring:beans>
+        <spring:import resource="classpath:customerapi.xml"/>
+    </spring:beans>
+    <http:request-config name="HTTP_Request_Configuration" host="localhost" port="8081" basePath="api/" doc:name="HTTP Request Configuration">
+        <http:raml-api-configuration location="customerapi.raml"/>
+    </http:request-config>
+    <munit:before-test name="test-get-suiteBefore_Test" description="Before tests actions">
+        <db:delete config-ref="MySQL_Configuration" doc:name="Clear Database">
+            <db:parameterized-query><![CDATA[delete from customer]]></db:parameterized-query>
+        </db:delete>
+        <db:insert config-ref="MySQL_Configuration" doc:name="Insert customer 1 into database">
+            <db:parameterized-query><![CDATA[INSERT INTO customer (`id`, `first_name`, `last_name`, `address`, `last_modified`) VALUES ('1', 'firstNameGet', 'lastNameGet', 'addressGet', UTC_TIMESTAMP());]]></db:parameterized-query>
+        </db:insert>
+        <db:insert config-ref="MySQL_Configuration" doc:name="Insert customer 2 into database">
+            <db:parameterized-query><![CDATA[INSERT INTO customer (`id`, `first_name`, `last_name`, `address`, `last_modified`) VALUES ('2', 'firstNameGet2', 'lastNameGet2', 'addressGet2', UTC_TIMESTAMP());]]></db:parameterized-query>
+        </db:insert>
+    </munit:before-test>
+    <munit:test name="TestListCustomers" description="MUnit Test">
+        <http:request config-ref="HTTP_Request_Configuration" path="/customers" method="GET" doc:name="List Customers"/>
+        <munit:assert-true condition="#[message.inboundProperties.'http.status' == 200]" doc:name="Assert Http Code is 200"/>
+        <json:json-to-object-transformer returnClass="java.util.List" doc:name="JSON to Object"/>
+        <munit:assert-true condition="#[payload.size() == 2]" doc:name="Assert One Customer Returned"/>
+    </munit:test>
+    <munit:test name="TestGetCustomerByIdReturnsCustomerInformation" description="MUnit Test">
+        <http:request config-ref="HTTP_Request_Configuration" path="/customers/{id}" method="GET" doc:name="Get Customer By Id">
+            <http:request-builder>
+                <http:uri-param paramName="id" value="1"/>
+            </http:request-builder>
+        </http:request>
+        <munit:assert-true condition="#[message.inboundProperties.'http.status' == 200]" doc:name="Assert Http Code is 200"/>
+        <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+        <munit:assert-true condition="#[payload.'lastName'.equals(&quot;lastNameGet&quot;) &amp;&amp; payload.'firstName'.equals(&quot;firstNameGet&quot;)&amp;&amp; payload.'address'.equals(&quot;addressGet&quot;)]" doc:name="Assert Customer 1 Returned"/>
+    </munit:test>
+    <munit:test name="TestGetCustomerByIdWithIfNotMofidifiedHeaderReturns304WhenNoChanges" description="MUnit Test">
+        <http:request config-ref="HTTP_Request_Configuration" path="/customers/{id}" method="GET" doc:name="Conditional Get Customer">
+            <http:request-builder>
+                <http:uri-param paramName="id" value="1"/>
+                <http:header headerName="If-Modified-Since" value="Sun, 6 Jan 3011 0:22:20 GMT"/>
+            </http:request-builder>
+        </http:request>
+        <munit:assert-true condition="#[message.inboundProperties.'http.status' == 304]" doc:name="Assert Http Code is 304"/>
+    </munit:test>
+    <munit:test name="TestGetCustomerByNonExistingIdReturns404" description="MUnit Test">
+        <http:request config-ref="HTTP_Request_Configuration" path="/customers/{id}" method="GET" doc:name="Get Customer By No Existing Id">
+            <http:request-builder>
+                <http:uri-param paramName="id" value="-1"/>
+            </http:request-builder>
+            <http:success-status-code-validator values="404"/>
+        </http:request>
+    </munit:test>
+    
+    
+    
+</mule>

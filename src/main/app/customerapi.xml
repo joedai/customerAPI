@@ -25,9 +25,9 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
         <db:update config-ref="MySQL_Configuration" doc:name="Database">
             <db:parameterized-query><![CDATA[update customer set last_name = #[payload.lastName], first_name = #[payload.firstName], address = #[payload.address], last_modified = UTC_TIMESTAMP() where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
         </db:update>
-        <choice doc:name="Choice">
+        <choice doc:name="Check if there is a row updated">
             <when expression="#[payload.equals(0)]">
-                <scripting:component doc:name="Groovy">
+                <scripting:component doc:name="Return 404">
                     <scripting:script engine="Groovy"><![CDATA[throw new org.mule.module.apikit.exception.NotFoundException()]]></scripting:script>
                 </scripting:component>
             </when>
@@ -40,9 +40,9 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
         <db:update config-ref="MySQL_Configuration" doc:name="Database">
             <db:parameterized-query><![CDATA[update customer set deleted ='true', last_modified = UTC_TIMESTAMP() where id = #[message.inboundProperties.'http.uri.params'.id] and deleted = 'false']]></db:parameterized-query>
         </db:update>
-        <choice doc:name="Choice">
+        <choice doc:name="Check if there is a row deleted">
             <when expression="#[payload.equals(0)]">
-                <scripting:component doc:name="Groovy">
+                <scripting:component doc:name="Return 404">
                     <scripting:script engine="Groovy"><![CDATA[throw new org.mule.module.apikit.exception.NotFoundException()]]></scripting:script>
                 </scripting:component>
             </when>
@@ -52,7 +52,7 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
         </choice>
     </flow>
     <flow name="get:/customers:customerapi-config">
-        <choice doc:name="Choice">
+        <choice doc:name="Check if lastModified parameter is provided">
             <when expression="#[message.inboundProperties.'http.query.params'.lastModified == null]">
                 <logger level="INFO" doc:name="Logger"/>
                 <db:select config-ref="MySQL_Configuration" doc:name="Database">
@@ -82,7 +82,7 @@ payload map ((payload01 , indexOfPayload01) -> {
     <flow name="get:/customers/{id}:customerapi-config">
         <choice doc:name="Check if If-Modified-Since Header is present">
             <when expression="#[message.inboundProperties.'If-Modified-Since' == null]">
-                <flow-ref name="GetDataFromDB" doc:name="Flow Reference"/>
+                <flow-ref name="GetDataFromDB" doc:name="Read from Database"/>
             </when>
             <otherwise>
                 <db:select config-ref="MySQL_Configuration" doc:name="Database">
@@ -98,7 +98,7 @@ and id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-
                         <set-payload value="#[null]" doc:name="Return 304 Not Modified"/>
                     </when>
                     <otherwise>
-                        <flow-ref name="GetDataFromDB" doc:name="Flow Reference"/>
+                        <flow-ref name="GetDataFromDB" doc:name="Read from Database"/>
                     </otherwise>
                 </choice>
             </otherwise>
@@ -111,7 +111,7 @@ and id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-
         <choice doc:name="Check if id exists">
             <when expression="#[payload.size() == 1]">
                 <set-payload value="#[payload[0]]" doc:name="Get the first row"/>
-                <dw:transform-message doc:name="Copy_of_Transform Message">
+                <dw:transform-message doc:name="Transform Message">
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 ---

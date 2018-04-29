@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration" mock-connectors="false" mock-inbounds="false"/>
+    <spring:beans>
+        <spring:import resource="classpath:customerapi.xml"/>
+    </spring:beans>
+    <http:request-config name="HTTP_Request_Configuration" host="localhost" port="8081" basePath="api/" doc:name="HTTP Request Configuration">
+        <http:raml-api-configuration location="customerapi.raml"/>
+    </http:request-config>    
+    <munit:before-test name="test-delete-customer-suiteBefore_Test" description="Before tests actions">
+        <db:delete config-ref="MySQL_Configuration" doc:name="Clear Database">
+            <db:parameterized-query><![CDATA[delete from customer]]></db:parameterized-query>
+        </db:delete>
+        <db:insert config-ref="MySQL_Configuration" doc:name="Insert customer 1 into database">
+            <db:parameterized-query><![CDATA[INSERT INTO customer (`id`, `first_name`, `last_name`, `address`, `last_modified`) VALUES ('1', 'firstNameGet', 'lastNameGet', 'addressGet', UTC_TIMESTAMP());]]></db:parameterized-query>
+        </db:insert>
+    </munit:before-test>
+    <munit:test name="TestCustomerIsDeleted" description="Test">
+        <http:request config-ref="HTTP_Request_Configuration" path="/customers/{id}" method="DELETE" doc:name="Delete Customer By Id">
+            <http:request-builder>
+                <http:uri-param paramName="id" value="1"/>
+            </http:request-builder>
+        </http:request>
+        <munit:assert-true condition="#[message.inboundProperties.'http.status' == 204]" doc:name="Assert Http Code is 204"/>
+        <db:select config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[select count(*) as cnt from customer where deleted ='false' and id = 1]]></db:parameterized-query>
+        </db:select>
+        <munit:assert-true condition="#[payload.get(0).cnt == 0]" doc:name="Assert Data Has Been Soft Deleted"/>
+    </munit:test>
+    <munit:test name="TestDeleteCustomerReturns404WhenCustomerDoesNotExist" description="MUnit Test">
+        <http:request config-ref="HTTP_Request_Configuration" path="/customers/{id}" method="DELETE" doc:name="Delete Customer By Non Existing Id">
+            <http:request-builder>
+                <http:uri-param paramName="id" value="-1"/>
+            </http:request-builder>
+            <http:success-status-code-validator values="404"/>
+        </http:request>
+    </munit:test>
+</mule>
