@@ -30,7 +30,12 @@ This parameter will be used by the server to check if there are any changes afte
 * Any updates to existing customers
 * Any deletion to existing customers(the *deleted* field will be *true*)
 
+# Test Coverages
+Application Coverage: 
+![Application Coverage](https://github.com/joedai/customerAPI/blob/master/reports/Application%20Coverage.png  "Application Coverage")
 
+Resource Coverage: 
+![Resource Coverage](https://github.com/joedai/customerAPI/blob/master/reports/Resource%20Coverage.png  "Resource Coverage")
 
 # To Run The APIs
 Database is required to get the APIs running
