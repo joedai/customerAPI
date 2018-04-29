@@ -14,11 +14,21 @@ This API allows the client to
 ## Contiditonal Get
 The API allows the client to do a conditional GET by providing the *If-Modified-Since* HTTP header.
 
-This feature is useful for mobile apps as it saves bandwidth by returning no body content.
+e.g.
+```
+GET /api/customers/1 HTTP/1.1
+Host: localhost:8081
+Content-Type: application/json
+If-Modified-Since: Sun, 29 Apr 3011 18:22:20 GMT
+```
+
+The server will use it to see if the given customer has changed since the provided time. The date is returned only if changes are found.
+
+This feature is useful for mobile apps as it saves bandwidth by returning no body content when there are no changes.
 
 
 ## Periodic Synchronisation
-For clients who needs to synchronise the customers periodically, they can add the *lastModified* query parameter to the GET end point to get the incremental changes.
+For clients who need to synchronise the customers periodically, they can add the *lastModified* query parameter to the GET end point to get the incremental changes.
 
 e.g.
 ```
@@ -29,6 +39,15 @@ This parameter will be used by the server to check if there are any changes afte
 * New customers stored
 * Any updates to existing customers
 * Any deletion to existing customers(the *deleted* field will be *true*)
+
+# TODOs
+Due to the time restrains, there are quite a few things that need to be improved/implemented at a later stage
+
+* Duplication check
+* Request validation, e.g. returns 400 when the payload is malformatted
+* PATCH operation that allows patial update
+* More search parameters
+* More test coverage
 
 # Test Coverages
 Application Coverage: 
