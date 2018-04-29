@@ -11,9 +11,18 @@ http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/cu
     <spring:beans>
         <spring:import resource="classpath:customerapi.xml"/>
     </spring:beans>
+    <munit:before-test name="test-create-customer-suiteBefore_Test" description="Before tests actions">
+        <db:delete config-ref="MySQL_Configuration" doc:name="Clear Database">
+            <db:parameterized-query><![CDATA[delete from customer]]></db:parameterized-query>
+        </db:delete>
+    </munit:before-test>
     <munit:test name="new-test-suite-post:/customers:application/json:customerapi-configTest" description="Test">
-        <set-payload value="[               { &quot;firstName&quot;: &quot;Test&quot;, &quot;lastName&quot; : &quot;Mule&quot;, &quot;address&quot;: &quot;2 Test Street&quot;} ]" mimeType="application/json" doc:name="Set Payload"/>
+        <set-payload value="[               { &quot;firstName&quot;: &quot;TestFirstName&quot;, &quot;lastName&quot; : &quot;TestLastName&quot;, &quot;address&quot;: &quot;2 Test Street&quot;} ]" mimeType="application/json" doc:name="Set Payload"/>
         <munit:set payload="#[payload]" mimeType="application/json" doc:name="Set Message"/>
         <flow-ref name="post:/customers:application/json:customerapi-config" doc:name="Flow-ref to post:/customers:application/json:customerapi-config"/>
+        <db:select config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified, deleted from customer]]></db:parameterized-query>
+        </db:select>
+        <munit:assert-true condition="#[payload.size() == 1 &amp;&amp; payload[0].first_name.equals(&quot;TestFirstName&quot;) &amp;&amp; payload[0].last_name.equals(&quot;TestLastName&quot;) &amp;&amp; payload[0].address.equals(&quot;2 Test Street&quot;)]" doc:name="Assert data is stored in DB correctly"/>
     </munit:test>
 </mule>

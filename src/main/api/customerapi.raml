@@ -66,7 +66,7 @@ types:
           body: 
             description: |
               Customer not found. This error occurs when there is not customer found with the id provided
-            example: {"error" : "Customer not found"}
+            example: {"message" : "Customer not found"}
         304:
           description: |
             If the customer with the id provided has no change since the modified time specified in the header, not data will be                  returned. This is useful for mobile apps as it saves in bandwidth by returning no body content
@@ -81,7 +81,7 @@ types:
           body: 
             description: |
               Customer not found. This error occurs when there is not customer found with the id provided
-            example: {"error" : "Customer not found"}
+            example: {"message" : "Customer not found"}
 
     put:
       description: Updates the customer details
@@ -95,10 +95,10 @@ types:
           description: |
             The body requested was invalid 
           body: 
-            example: {"error" : "The body requested was invalid"}
+            example: {"message" : "The body requested was invalid"}
         404:
           body: 
             description: |
               Customer not found. This error occurs when there is not customer found with the id provided
-            example: {"error" : "Customer not found"}
+            example: {"message" : "Customer not found"}
       
