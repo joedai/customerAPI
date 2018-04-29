@@ -37,9 +37,9 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
         </choice>
     </flow>
     <flow name="delete:/customers/{id}:customerapi-config">
-        <db:delete config-ref="MySQL_Configuration" doc:name="Database">
-            <db:parameterized-query><![CDATA[delete from customer where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
-        </db:delete>
+        <db:update config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[update customer set deleted ='true', last_modified = UTC_TIMESTAMP() where id = #[message.inboundProperties.'http.uri.params'.id] and deleted = 'false']]></db:parameterized-query>
+        </db:update>
         <choice doc:name="Choice">
             <when expression="#[payload.equals(0)]">
                 <scripting:component doc:name="Groovy">
@@ -56,12 +56,12 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
             <when expression="#[message.inboundProperties.'http.query.params'.lastModified == null]">
                 <logger level="INFO" doc:name="Logger"/>
                 <db:select config-ref="MySQL_Configuration" doc:name="Database">
-                    <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified from customer]]></db:parameterized-query>
+                    <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified,deleted from customer where deleted = 'false']]></db:parameterized-query>
                 </db:select>
             </when>
             <otherwise>
                 <db:select config-ref="MySQL_Configuration" doc:name="Query by last modified date">
-                    <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified from customer where last_modified >  STR_TO_DATE(#[message.inboundProperties.'http.query.params'.lastModified], '%a, %d %b %Y %H:%i:%s')]]></db:parameterized-query>
+                    <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified,deleted from customer where last_modified >  STR_TO_DATE(#[message.inboundProperties.'http.query.params'.lastModified], '%a, %d %b %Y %H:%i:%s')]]></db:parameterized-query>
                 </db:select>
             </otherwise>
         </choice>
@@ -74,7 +74,8 @@ payload map ((payload01 , indexOfPayload01) -> {
 	lastModified: (payload01.last_modified as :string {format: "E, d LLL u H:m:s"}) ++ " GMT",
 	firstName: payload01.first_name,
 	lastName: payload01.last_name,
-	address: payload01.address
+	address: payload01.address,
+	deleted: payload01.deleted
 })]]></dw:set-payload>
         </dw:transform-message>
     </flow>
@@ -105,7 +106,7 @@ and id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-
     </flow>
     <flow name="GetDataFromDB" initialState="started">
         <db:select config-ref="MySQL_Configuration" doc:name="Get Customer By ID">
-            <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified from customer where id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-query>
+            <db:parameterized-query><![CDATA[select id, first_name, last_name, address, last_modified, deleted from customer where id = #[message.inboundProperties.'http.uri.params'.id] and deleted = 'false']]></db:parameterized-query>
         </db:select>
         <choice doc:name="Check if id exists">
             <when expression="#[payload.size() == 1]">
@@ -119,7 +120,8 @@ and id = #[message.inboundProperties.'http.uri.params'.id]]]></db:parameterized-
 	lastModified: (payload.last_modified as :string {format: "E, d LLL u H:m:s"}) ++ " GMT",
 	firstName : payload.first_name,
 	lastName : payload.last_name,
-	address : payload.address
+	address : payload.address,
+	deleted : payload.deleted
 }]]></dw:set-payload>
                 </dw:transform-message>
                 <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/json" doc:name="JSON to Object"/>

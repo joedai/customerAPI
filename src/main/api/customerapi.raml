@@ -13,10 +13,17 @@ types:
       lastName?: string
       address?: string
       lastModified?: datetime
+      deleted?: boolean
 
 /customers:
   get:
-    description: Returns all the customers
+    description: Returns a list of customers
+    queryParameters: 
+      lastModified: 
+        example: Sat, 28 Apr 2018 21:17:32 GMT
+        required: false
+        description: |
+          This pamameter is used to retrieve customers that have been updated or created since the given time. If not provided then             all customers will be returned
     responses: 
       200: 
         body: 
@@ -26,7 +33,7 @@ types:
               {"id": 1, "firstName": "Joe", "lastName" : "Dai", "address": "8 Rhinevale Close"},
               {"id": 2, "firstName": "Shubin", "lastName" : "Dai", "address": "1 Happy Street"}
             ]
-  
+
   post:
     description: |
       Creates customers with infomation provided. You can provide more than one customers in the payload to perform batch creation.
